@@ -1,0 +1,50 @@
+﻿
+<style type="text/css" media="screen">
+    #templateSourceEditor {
+        height: 300px;
+    }
+</style>
+
+<div class="pull-left col-md-10">
+    <div id="templateSourceEditor"></div>
+</div>
+
+
+<script type="text/javascript">
+    var designSourceEditor = function () {
+        var templateSourceEditor = $("#templateSourceEditor");  
+
+        var getSourceCodeEditor = function () {
+            return templateSourceEditor.data('AceInstance').getSession();
+        }
+
+        return {
+            init: function () {
+                //Create source editor for developer mode
+                var editor = ace.edit("templateSourceEditor");
+                editor.setTheme("ace/theme/dreamweaver");
+                editor.getSession().setMode("ace/mode/html");
+
+                //Set source editor object, in order to be able to access it later
+                templateSourceEditor.data('AceInstance', editor);
+
+            },
+            getSource: function() {
+                var sourceEditor = getSourceCodeEditor();
+                var razorSource = sourceEditor.getValue();
+
+                return razorSource;
+            },
+            setSource: function(templateSource) {
+                var sourceEditor = getSourceCodeEditor();
+
+                sourceEditor.setValue(templateSource);
+            },
+            setDefault: function () {
+                var sourceEditor = getSourceCodeEditor();
+
+                sourceEditor.setValue('');
+            }
+        }
+    }
+</script>

@@ -1,0 +1,302 @@
+﻿
+<style>
+    .overlay {
+        background-color: white;
+        opacity: 0;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+        vertical-align: top;
+        position: absolute;
+        z-index: 100;
+    }
+
+    .draggablenode {
+        color: #333;
+        cursor: pointer;
+        border: 1px solid #aaaaaa;
+        margin: 4px 4px 4px 1px;
+        border-radius: 3px;
+        font-size: 14px;
+        line-height: 13px;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        padding: 3px 5px 3px 5px;
+        background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, color-stop(20%, #f4f4f4), color-stop(50%, #f0f0f0), color-stop(52%, #e8e8e8), color-stop(100%, #eee));
+        background-image: linear-gradient(to top, #f4f4f4 20%, #f0f0f0 50%, #e8e8e8 52%, #eee 100%);
+        background-image: -webkit-linear-gradient(top, #f4f4f4 20%, #f0f0f0 50%, #e8e8e8 52%, #eee 100%);
+        background-color: #e4e4e4;
+        z-index: 101;
+    }
+</style>
+<div id="templateEditorArea">
+    <div class="row">
+        <div class="col-md-10">
+            <textarea id="templateDesignEditor"></textarea>
+        </div>
+        <div class="col-md-2">
+            <h5>Drag properties:</h5>
+            <div id="draggableList"></div>
+        </div>
+    </div>
+    <div id="hiddenRazorSnippets" class="hidden">
+    </div>
+</div>
+
+<script type="text/javascript">
+    var designTemplateEditor = function () {
+        var container = $("#templateEditorArea");
+        var templateDesignEditor = container.find("#templateDesignEditor");
+        var draggableList = container.find("#draggableList");
+        var hiddenRazorSnippets = container.find("#hiddenRazorSnippets");
+
+        var getDesignTemplateEditor = function () {
+            return CKEDITOR.instances[templateDesignEditor.attr('id')];
+        }
+
+        var convertFromSource = function (razorTemplate) {
+            hiddenRazorSnippets.empty();
+
+            //Find all ##1## tokens
+            razorTemplate = replaceSnippetsWithImages(razorTemplate, /#{2}[0-9]+#{2}/gm);
+
+            return razorTemplate;
+        }
+
+        var replaceSnippetsWithImages = function (razorTemplate, regex) {
+            var foundSnippets = razorTemplate.match(regex);
+            var tokens        = templateDesignEditor.data('tokens');
+            if (foundSnippets) {
+                for (var i = 0; i < foundSnippets.length; i++) {
+                    var snippetContents = foundSnippets[i];
+                    var token = $.grep(tokens, function(e) {
+                        return e.TokenId == snippetContents;
+                    })[0];
+
+                    var modelStatementId = getUniqueId();
+
+                    var replacementImage = createImageElement(modelStatementId, token.DisplayName, token.EncodedImage);
+                    var hiddenDiv = $("<div></div>").attr('id', modelStatementId).text(token.ReplacedText);
+
+                    razorTemplate = razorTemplate.replace(new RegExp(escapeRegExp(snippetContents), "gm"), replacementImage);
+
+                    hiddenRazorSnippets.append(hiddenDiv);
+                }
+            }
+
+            return razorTemplate;
+        }
+
+        //Convert html from design template tab to razor source
+        var convertToSource = function (designTemplate) {
+            var parsedTemplate = $('<html></html>').append(designTemplate);
+            var replacedSnippets = parsedTemplate.find("img[temp=true]");
+            if (replacedSnippets.length == 0) {
+                return designTemplate;
+            }
+
+            designTemplate = parsedTemplate[0].outerHTML;
+
+            for (var i = 0; i < replacedSnippets.length; i++) {
+                var replacedSnippet = replacedSnippets[i];
+                var refId = $(replacedSnippet).attr("ref");
+                if (refId) {
+                    var hiddenElementId = "#" + refId;
+                    var hiddenElement = $(hiddenElementId)[0];
+                    if (hiddenElement == undefined) {
+                        console.log(replacedSnippet);
+                    }
+                    var hiddentElementHtml = $(replacedSnippet).wrapAll('<div></div>').parent().html();
+
+                    designTemplate = designTemplate.replace(new RegExp(escapeRegExp(hiddentElementHtml), "gm"), htmlDecode(hiddenElement.innerHTML));
+                }
+            }
+
+            return convertToSource(designTemplate);
+        }
+
+        //Setup for kendo treeview
+        var createDraggableList = function (modelProperties) {
+            draggableList.empty();
+
+            for (var i = 0; i < modelProperties.length; i++) {
+                var property = modelProperties[i];
+                var nodeDiv  = $('<div class="draggablenode">' + property.DisplayText + '</div>');
+                nodeDiv.attr("data-text", property.ReplacedText);
+
+                draggableList.append(nodeDiv);
+            }
+
+            $('.draggablenode').each(function () {
+                var draggableNode = new Draggabilly(this);
+
+                draggableNode.on('dragStart', onDragStart);
+                draggableNode.on('dragMove', onDragMove);
+                draggableNode.on('dragEnd', onDragEnd);
+            });
+        }
+
+        function onDragMove(instance, event, pointer) {
+            var iframeDoc = container.find("iframe.cke_wysiwyg_frame")[0].contentWindow.document;
+            var editorOffset = container.find('#cke_templateDesignEditor').offset();
+
+            var offsetLeft = editorOffset.left - $(window).scrollLeft();
+            var offsetTop = editorOffset.top - $(window).scrollTop();
+
+            var dragX = event.clientX - offsetLeft;
+            var dragY = event.clientY - offsetTop - 40;
+
+            var selection;
+            var range;
+
+            // Try the standards-based way first
+            if (iframeDoc.caretPositionFromPoint) {
+                selection = iframeDoc.getSelection();
+                var position = iframeDoc.caretPositionFromPoint(dragX, dragY);
+
+                range = iframeDoc.createRange();
+                range.setStart(position.offsetNode, position.offset);
+                range.setEnd(position.offsetNode, position.offset);
+                range.collapse(true);
+
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+                // Next, the WebKit way
+            else if (iframeDoc.caretRangeFromPoint) {
+                selection = iframeDoc.getSelection();
+                range = iframeDoc.caretRangeFromPoint(dragX, dragY);
+                if (range) {
+                    range.setStart(range.startContainer, range.startOffset);
+                    range.setEnd(range.startContainer, range.startOffset);
+
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+                // Finally, the IE way
+            else if (iframeDoc.body.createTextRange) {
+                $('#editorOverlay').hide();
+                range = iframeDoc.body.createTextRange();
+                try {
+                    range.moveToPoint(dragX, dragY);
+                    range.select();
+                } catch (e) { }
+
+
+                $('#editorOverlay').show();
+            }
+        }
+
+        function onDragStart(instance, event, pointer) {
+            var editor = getDesignTemplateEditor();
+            editor.focus();
+
+            var iframe = container.find("iframe.cke_wysiwyg_frame");
+            var parentContainer = iframe.parent();
+
+            parentContainer.prepend('<div id="editorOverlay" class="overlay"></div>');
+
+            $("#editorOverlay").css({
+                "width": (iframe.outerWidth()),
+                "height": (iframe.outerHeight()),
+                "z-index": 100
+            });
+        }
+
+        function onDragEnd(instance, event, pointer) {
+            $('#editorOverlay').remove();
+
+            var draggedNode = $(instance.element).clone();
+            draggedNode.attr('style', 'position: relative;left:0px; top:0px;');
+            draggableList.prepend(draggedNode);
+
+            var draggableNode = new Draggabilly(draggedNode[0]);
+
+            draggableNode.on('dragStart', onDragStart);
+            draggableNode.on('dragMove', onDragMove);
+            draggableNode.on('dragEnd', onDragEnd);
+
+            $(instance.element).remove();
+
+            var editor = getDesignTemplateEditor();
+            editor.focus();
+
+            var propertyName = $(instance.element).text();
+            var properties   = templateDesignEditor.data('modelProperties');
+            var replacedText = $(instance.element).attr('data-text');
+
+            var propertyInfo = $.grep(properties, function (e) {
+                return e.DisplayText == propertyName;
+            })[0];
+
+            var modelStatementId = getUniqueId();
+            var replacementImage = createImageElement(modelStatementId, propertyName, propertyInfo.EncodedImage);
+
+            getDesignTemplateEditor().insertHtml(replacementImage, "unfiltered_html");
+
+            var hiddenDiv = $("<div></div>").attr('id', modelStatementId).text(replacedText);
+            hiddenRazorSnippets.append(hiddenDiv);
+
+        }
+
+        var createImageElement = function (id, text, image) {
+            return ' <img ref="'
+                + id
+                + '" src="data:image/jpeg;base64,' + image + '" '
+                + ' style="cursor:default; border: 1px solid #aaaaaa; border-radius: 3px;background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, color-stop(20%, #f4f4f4), color-stop(50%, #f0f0f0), color-stop(52%, #e8e8e8), color-stop(100%, #eee)); background-image: linear-gradient(to top, #f4f4f4 20%, #f0f0f0 50%, #e8e8e8 52%, #eee 100%); background-image: -webkit-linear-gradient(top, #f4f4f4 20%, #f0f0f0 50%, #e8e8e8 52%, #eee 100%);   background-color: #e4e4e4;" temp="true" /> ';
+        }
+
+        //Decodes escaped html into a regular html format
+        var htmlDecode = function (input) {
+            return $('<div/>').html(input).text();
+        }
+
+        var getUniqueId = function () {
+            // Math.random should be unique because of its seeding algorithm.
+            // Convert it to base 36 (numbers + letters), and grab the first 9 characters
+            // after the decimal.
+            return '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        var escapeRegExp = function (str) {
+            return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+        }
+
+        return {
+            init: function () {
+                //Create kendo editor for template design mode
+                CKEDITOR.replace(templateDesignEditor[0],
+                {
+                    height: "650px",
+                    autoGrow_minHeight: "500px",
+                    width: "100%",
+                });
+
+                templateDesignEditor.data('tokens', {});
+                templateDesignEditor.data('modelProperties', {});
+            },
+            setDefault: function () {
+                getDesignTemplateEditor().setData("");
+                draggableList.empty();
+            },
+            setTemplate: function (templateSource, tokens, modelProperties) {
+                if (modelProperties) {
+                    templateDesignEditor.data('tokens', tokens);
+                    templateDesignEditor.data('modelProperties', modelProperties);
+                    createDraggableList(modelProperties);
+                }
+                var convertedTemplate = convertFromSource(templateSource);
+                getDesignTemplateEditor().setData(convertedTemplate);
+            },
+            getSource: function () {
+                var designEditor = getDesignTemplateEditor();
+
+                var designTemplate = designEditor.getData();
+                var templateSource = convertToSource(designTemplate);
+
+                return templateSource;
+            }
+        }
+    };
+</script>

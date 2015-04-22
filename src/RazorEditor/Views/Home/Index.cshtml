@@ -1,0 +1,219 @@
+﻿@{
+    ViewBag.Title = "";
+}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Select template and model to edit...</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 well">
+            <div class="col-md-5">
+                <input id="SelectedTemplate" type="hidden"/>
+            </div>
+            <div id="divModelSelection" class="col-md-4" style="display:none;">
+                <input id="SelectedModel" type="hidden" />
+            </div>
+        </div>
+    </div>
+    <div class="row" id="divEmailTemplateEditor" style="display:none;">
+        <div class="col-md-11">
+            <div role="tabpanel">
+
+                <!-- Nav tabs -->
+                <ul class="nav nav-tabs" role="tablist">
+                    <li role="presentation" class="active"><a href="#design" id="designtab" aria-controls="home" role="tab" data-toggle="tab"><i class="fa fa-file-image-o"></i>&nbsp;Design view</a></li>
+                    <li role="presentation"><a href="#developer" id="sourcetab" aria-controls="profile" role="tab" data-toggle="tab"><i class="fa fa-file-code-o"></i>&nbsp;Developer view</a></li>
+                </ul>
+
+                <!-- Tab panes -->
+                <div class="tab-content">
+                    <div role="tabpanel" class="tab-pane active well" id="design">
+                        <div id="templateDesignEditor" class="row">
+                            @Html.Partial("~/Views/Shared/_DesignTemplateEditor.cshtml")
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <button id="btnSubmitTemplate" class="btn btn-primary">
+                                    <i class='fa fa-save'></i> &nbsp; Save
+                                </button>
+                                <button id="btnPreviewTemplate" class="btn btn-default">
+                                    <i class='fa fa-search'></i> &nbsp; Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div role="tabpanel" class="tab-pane well" id="developer">
+                        <div class="row">
+                            @Html.Partial("~/Views/Shared/_DeveloperTemplateEditor.cshtml")
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <button id="btnSubmitCode" class="btn btn-primary">
+                                    <i class='fa fa-save'></i> &nbsp; Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+ <!-- Modal confirm save dialog -->
+<div class="modal fade" id="save-modal" role="dialog" aria-labelledby="confirm-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title">Save template</h4>
+            </div>
+            <div class="modal-body">
+                <p>Do you want to save template?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="confirm">Save</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script>
+        $(document).ready(function() {
+            var sourceEditor = designSourceEditor();
+            sourceEditor.init();
+
+            var designEditor = designTemplateEditor();
+            designEditor.init();
+
+            $('#SelectedTemplate').select2({
+                placeholder: 'Select template to edit...',
+                allowClear: true,
+                ajax: {
+                    url: '@Url.Action("GetTemplateNames", "Ajax", new {httproute = ""})',
+                    type: "GET",
+                    results: function(data) {
+                        return { results: data, more: false };
+                    }
+                }
+            });
+
+            $('#SelectedModel').select2({
+                placeholder: 'Select model...',
+                allowClear: true,
+                ajax: {
+                    url: '@Url.Action("GetModelNames", "Ajax", new {httproute = ""})',
+                    type: "GET",
+                    results: function(data) {
+                        return { results: data, more: false };
+                    }
+                }
+            });
+
+            //Selected template dropdown change event
+            $("#SelectedTemplate").change(function(event) {
+                if (event.val) {
+                    $("#divModelSelection").show();
+                } else {
+                    $("#divModelSelection").hide();
+                    $("#divEmailTemplateEditor").hide();
+
+                    $("#SelectedModel").select2('data', '');
+                    designEditor.setDefault();
+                    sourceEditor.setDefault();
+                }
+            });
+
+
+            //Selected template dropdown change event
+            $("#SelectedModel").change(function(event) {
+                if (event.val) {
+                    var selectedTemplate = $("#SelectedTemplate").select2('data').text;
+                    var selectedModel = $("#SelectedModel").select2('data').text;
+
+                    $.ajax({
+                        type: 'GET',
+                        url: '@Url.Action("GetTemplate", "Ajax", new {httproute = ""})',
+                        data: { "templateName": selectedTemplate, "modelName": selectedModel },
+                        //If template data was successfully obtained
+                        success: function(vm) {
+                            //Show template design tab
+                            $('#designtab').tab('show');
+
+                            designEditor.setTemplate(vm.ProcessedSource, vm.Tokens, vm.Properties);
+
+                            $("#divEmailTemplateEditor").show();
+                        }
+                    });
+                } else {
+                    $("#divEmailTemplateEditor").hide();
+                    designEditor.setDefault();
+                    sourceEditor.setDefault();
+                }
+            });
+
+            $("#btnSubmitTemplate").click(function (e) {
+                var razorSource   = designEditor.getSource();
+                var templateName  = $("#SelectedTemplate").select2('data').text;
+                var selectedModel = $("#SelectedModel").select2('data').text;
+
+                $('#save-modal #confirm').click(function (e) {
+                    $.ajax({
+                        type: 'POST',
+                        contentType: 'application/json; charset=utf-8',
+                        dataType: 'json',
+                        url: '@Url.Action("SaveTemplate", "Ajax", new {httproute = ""})',
+                        data: JSON.stringify({ "TemplateSource": razorSource, "ModelType": selectedModel, "TemplateName": templateName }),
+                        success: function (vm) {
+                        }
+                    });
+
+                    $('#save-modal').modal('hide');
+                });
+
+                //show modal dialog
+                $('#save-modal').modal('show');
+            });
+
+            $("#btnPreviewTemplate").click(function (e) {
+
+            });
+
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+                var selectedTab = e.target.id;
+                var selectedModel = $("#SelectedModel").select2('data').text;
+
+                //Template tab
+                if (selectedTab == 'designtab') {
+                    var razorSource = sourceEditor.getSource();
+
+                    $.ajax({
+                        type: 'POST',
+                        contentType: 'application/json; charset=utf-8',
+                        dataType: 'json',
+                        url: '@Url.Action("ConvertTemplate", "Ajax", new {httproute = ""})',
+                        data: JSON.stringify({ "TemplateSource": razorSource, "ModelType": selectedModel }),
+                        success: function(vm) {
+                            designEditor.setTemplate(vm.ProcessedSource, vm.Tokens, vm.Properties);
+                        }
+                    });
+                }
+                //Source tab
+                else if (selectedTab == 'sourcetab') {
+                    var razorCodeTemplate = designEditor.getSource();
+                    sourceEditor.setSource(razorCodeTemplate);
+                }
+            });
+
+
+        });
+    </script>
+}
