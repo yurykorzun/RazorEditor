@@ -1,6 +1,5 @@
 ﻿using System.Drawing;
 using System.Reflection;
-using RazorEditor.Data;
 using RazorEditor.Models;
 using RazorEditor.Models.Datasource;
 using System;
@@ -11,10 +10,11 @@ using System.Web.Mvc.Razor;
 using System.Web.Razor.Parser;
 using System.Web.Razor.Parser.SyntaxTree;
 using System.Web.Razor.Text;
+using RazorEngine;
 
 namespace RazorEditor.Services
 {
-    public class TemplateService
+    public class TemplateService : ITemplateService
     {
         private readonly ImageService ImageService = new ImageService();
         private readonly FileService FileService   = new FileService();
@@ -49,6 +49,36 @@ namespace RazorEditor.Services
             var templateData  = GenerateTemplateModel(parsedSymbols, template.TemplateSource, modelType);
 
             return templateData;
+        }
+
+        public string PreviewTemplate(UpdateTemplateModel template)
+        {
+            var baseType      = typeof(BaseDatasourceModel);
+            var modelType     = baseType.Assembly.GetType(string.Format("{0}.{1}", baseType.Namespace, template.ModelType));
+            var modelInstance = (BaseDatasourceModel)Activator.CreateInstance(modelType);
+
+            var properties = modelType.GetProperties();
+
+            foreach (var property in properties)
+            {
+                if (property.PropertyType.IsGenericType && property.PropertyType.GetInterfaces().Any(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(ICollection<>)))
+                {
+                    var listType = typeof(List<>);
+                    var genericArgs = property.PropertyType.GetGenericArguments();
+                    var concreteType = listType.MakeGenericType(genericArgs);
+                    var newList = Activator.CreateInstance(concreteType);
+
+                    property.SetValue(modelInstance, newList);
+                }
+                else
+                {
+                    SetPropertyDummyValue(property, modelInstance);
+                }
+            }
+
+            var templatePreview = GenerateEmailFromTemplate(modelInstance, template.TemplateSource);
+
+            return templatePreview;
         }
 
 
@@ -194,6 +224,40 @@ namespace RazorEditor.Services
             return templateData;
 
         }
+
+        private string GenerateEmailFromTemplate<T>(T model, string razorTemplate)
+        {
+            if (string.IsNullOrWhiteSpace(razorTemplate))
+            {
+                throw new Exception(string.Format("Missing email template for {0}", typeof(T).Name));
+            }
+
+            try
+            {
+                return Razor.Parse(razorTemplate, model);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(string.Format("Exception occurred while parsing template {0}", typeof(T).Name), ex);
+            }
+        } 
+
+        private void SetPropertyDummyValue(PropertyInfo property, object instance)
+        {
+            if (property.PropertyType == typeof(string))
+            {
+                property.SetValue(instance, property.Name);
+            }
+            else if (property.PropertyType == typeof(int))
+            {
+                property.SetValue(instance, 0);
+            }
+            else if (property.PropertyType == typeof(DateTime))
+            {
+                property.SetValue(instance, DateTime.Now);
+            }
+        }
+
 
         #endregion
 

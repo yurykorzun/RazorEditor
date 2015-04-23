@@ -46,6 +46,9 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\packages\Newtonsoft.Json.6.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="RazorEngine">
+      <HintPath>..\packages\RazorEngine.3.6.6\lib\net45\RazorEngine.dll</HintPath>
+    </Reference>
     <Reference Include="SimpleInjector">
       <HintPath>..\packages\SimpleInjector.2.7.3\lib\net45\SimpleInjector.dll</HintPath>
     </Reference>
@@ -299,6 +302,7 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Attributes\AjaxOnly.cs" />
     <Compile Include="Controllers\AjaxController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Models\UpdateTemplateModel.cs" />
@@ -312,7 +316,10 @@
     <Compile Include="Models\TemplateTokenModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Models\Datasource\BaseDatasourceModel.cs" />
+    <Compile Include="Services\IFileService.cs" />
+    <Compile Include="Services\IImageService.cs" />
     <Compile Include="Services\ImageService.cs" />
+    <Compile Include="Services\ITemplateService.cs" />
     <Compile Include="Services\TemplateService.cs" />
   </ItemGroup>
   <ItemGroup>

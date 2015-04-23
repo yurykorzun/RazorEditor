@@ -5,7 +5,7 @@ using System.IO;
 
 namespace RazorEditor.Services
 {
-    public class ImageService
+    public class ImageService : IImageService
     {
         /// <summary>
         /// Creates 64base encoded string for passed text, so it can be embedded into email template preview

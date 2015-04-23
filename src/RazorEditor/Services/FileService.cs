@@ -3,9 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Web;
 
-namespace RazorEditor.Data
+namespace RazorEditor.Services
 {
-    public class FileService
+    public class FileService : IFileService
     {
         private const string PathToTemplates = @"\TestTemplates\";
 

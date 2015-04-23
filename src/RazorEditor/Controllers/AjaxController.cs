@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using RazorEditor.Attributes;
 using RazorEditor.Models;
 using RazorEditor.Services;
 
@@ -62,7 +63,13 @@ namespace RazorEditor.Controllers
             return Request.CreateResponse(HttpStatusCode.OK, template);
         }
 
+        [HttpPost]
+        public HttpResponseMessage Preview(UpdateTemplateModel template)
+        {
+            var result = new TemplateService().PreviewTemplate(template);
 
+            return Request.CreateResponse(HttpStatusCode.OK, result);
+        }
 
     }
 }

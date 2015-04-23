@@ -84,6 +84,24 @@
     </div>
 </div>
 
+ <!-- Modal preview template -->
+<div class="modal fade" id="preview-modal" role="dialog" aria-labelledby="preview-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title">Preview template</h4>
+            </div>
+            <div class="modal-body">
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts
 {
     <script>
@@ -184,7 +202,22 @@
             });
 
             $("#btnPreviewTemplate").click(function (e) {
+                var razorSource   = designEditor.getSource();
+                var templateName  = $("#SelectedTemplate").select2('data').text;
+                var selectedModel = $("#SelectedModel").select2('data').text;
 
+                $.ajax({
+                    type: 'POST',
+                    url: '@Url.Action("Preview", "Ajax", new { httproute = "" })',
+                    dataType: 'json',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({ "TemplateSource": razorSource, "ModelType": selectedModel, "TemplateName": templateName }),
+                    success: function (vm) {
+                        $('#preview-modal .modal-body').html(vm);
+                        //show modal dialog
+                        $('#preview-modal').modal('show');
+                    }
+                });
             });
 
             $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {

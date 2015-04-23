@@ -2,6 +2,8 @@
 using System.Web.Http;
 using System.Web.Mvc;
 using System.Web.Routing;
+using RazorEditor.Services;
+using SimpleInjector;
 
 namespace RazorEditor
 {
@@ -17,6 +19,15 @@ namespace RazorEditor
 
             var configuration = GlobalConfiguration.Configuration;
             configuration.Formatters.Remove(configuration.Formatters.XmlFormatter);
+
+            var container = new Container();
+            container.Register<IFileService, FileService>();
+            container.Register<IImageService, ImageService>();
+            container.Register<ITemplateService, TemplateService>();
+
+
+            container.Verify();
+            //DependencyResolver.SetResolver(new SimpleInjectorDependencyResolver(container));
         }
 
         protected void Session_Start(object sender, EventArgs e)
